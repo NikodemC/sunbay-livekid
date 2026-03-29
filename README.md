@@ -1,6 +1,6 @@
 # Integracja Zoho → Fakturownia
 
-Integracja umożliwia automatyczne przenoszenie faktur z systemu **Zoho Books** do **Fakturowni** oraz synchronizację statusów **KSeF** (Krajowy System e-Faktur) z powrotem do Zoho. Całość jest obsługiwana przez arkusz **Google Sheets** pełniący rolę kolejki i rejestru operacji, przy użyciu API platformy Sunbay.
+Integracja umożliwia automatyczne przenoszenie faktur z systemu **Zoho Billing** do **Fakturowni** oraz synchronizację statusów **KSeF** (Krajowy System e-Faktur) z powrotem do Zoho. Całość jest obsługiwana przez arkusz **Google Sheets** pełniący rolę kolejki i rejestru operacji, przy użyciu API platformy Sunbay.
 
 ---
 
@@ -8,9 +8,9 @@ Integracja umożliwia automatyczne przenoszenie faktur z systemu **Zoho Books** 
 
 | Zakładka | Rola |
 |----------|------|
-| **Queue** | Bieżąca kolejka faktur do przetworzenia |
-| **History** | Pełny log wszystkich operacji |
-| **KSeF** | Status KSeF każdej faktury |
+| **Zoho Invoices Queue** | Bieżąca kolejka faktur do przetworzenia |
+| **Invoice Action History** | Pełny log wszystkich operacji |
+| **Fakturownia KSeF Sync** | Status KSeF każdej faktury |
 | **Config** | Parametry konfiguracyjne |
 
 ---
@@ -18,16 +18,16 @@ Integracja umożliwia automatyczne przenoszenie faktur z systemu **Zoho Books** 
 ## Przepływ danych
 
 ```
-Zoho Books
+Zoho Billing
     │
     ▼  (1) Import invoices
-Google Sheets – Queue
+Google Sheets – Zoho Invoices Queue
     │
     ▼  (2) Copy to Fakturownia
 Fakturownia
     │
     ▼  (3) KSeF Sync
-Zoho Books (pola KSeF)
+Zoho Billing (pola KSeF)
 ```
 
 > Operacje można uruchamiać ręcznie z menu **Sunbay** w arkuszu lub skonfigurować jako automatyczne wyzwalacze Google Apps Script.
@@ -44,8 +44,8 @@ Pobiera nowe faktury z Zoho i dodaje je do kolejki w arkuszu.
 
 1. Pobiera faktury z wybranego widoku Zoho (`zohoKsefViewId` z zakładki Config).
 2. Sprawdza w bazie Sunbay, które faktury były już wcześniej zaimportowane.
-3. Nowe faktury trafiają do zakładki **Queue** ze statusem `New`.
-4. Operacja jest zapisywana w zakładce **History**.
+3. Nowe faktury trafiają do zakładki **Zoho Invoices Queue** ze statusem `New`.
+4. Operacja jest zapisywana w zakładce **Invoice Action History**.
 
 **Edge cases:**
 
@@ -61,17 +61,17 @@ Dla faktur ze statusem `New` lub `Queued` tworzy odpowiadające im faktury w Fak
 
 **Przebieg:**
 
-1. Wczytuje wiersze z **Queue** i filtruje te ze statusem `New` lub `Queued`.
+1. Wczytuje wiersze z **Zoho Invoices Queue** i filtruje te ze statusem `New` lub `Queued`.
 2. Przetwarza faktury partiami – rozmiar partii konfigurowany przez `batchSizeCopy` w zakładce Config.
 3. Dla każdej faktury:
-   - Pobiera pełne dane z Zoho.
+   - Pobiera pełne dane z Zoho Billing.
    - Mapuje pola Zoho na format Fakturowni, uwzględniając pola niestandardowe:
      - `cf_nip` → NIP nabywcy
      - `cf_nabywca` → opcjonalne nadpisanie nazwy nabywcy
      - `cf_rola_odbiorcy` + `cf_nip_odbiorcy` → dane odbiorcy, jeśli różni się od nabywcy
    - Tworzy fakturę w Fakturowni.
    - Zapisuje ID faktury Fakturowni z powrotem do Zoho jako pole `fakturownia_invoice_id`.
-   - Aktualizuje wiersz w Queue: status `Copied`, ID/numer faktury Fakturowni, link do faktury.
+   - Aktualizuje wiersz w Zoho Invoices Queue: status `Copied`, ID/numer faktury Fakturowni, link do faktury.
 
 **Edge cases:**
 
@@ -101,7 +101,7 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 
 **Przebieg:**
 
-1. Wczytuje zakładki **Queue** i **KSeF** z arkusza.
+1. Wczytuje zakładki **Zoho Invoices Queue** i **Fakturownia KSeF Sync** z arkusza.
 2. Wybiera faktury z ID Fakturowni, których status KSeF nie był jeszcze zapisany do Zoho.
 3. Pobiera dane KSeF z Fakturowni hurtowo dla wybranej partii (rozmiar: `batchSizeKsefSync`).
 4. Dla każdej faktury:
@@ -113,20 +113,20 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
      - Status, numer KSeF i daty (wysłania, sprzedaży)
      - Link do weryfikacji i link do faktury KSeF
      - Komunikaty błędów (tylko przy błędnym statusie)
-   - Aktualizuje wiersz w zakładce **KSeF**.
+   - Aktualizuje wiersz w zakładce **Fakturownia KSeF Sync**.
 
 **Edge cases:**
 
 - Faktury ze statusem `Unknown` → Zoho nie jest aktualizowane; faktura zostanie sprawdzona ponownie przy kolejnym uruchomieniu.
 - Faktura z już pomyślnie zapisanym statusem KSeF w Zoho → pomijana w kolejnych uruchomieniach.
-- Jeśli aktualizacja Zoho się nie powiedzie → status w zakładce KSeF oznaczany jako `Failed`; faktura zostanie podjęta ponownie przy następnym uruchomieniu.
+- Jeśli aktualizacja Zoho się nie powiedzie → status w zakładce **Fakturownia KSeF Sync** oznaczany jako `Failed`; faktura zostanie podjęta ponownie przy następnym uruchomieniu.
 - Daty są przekazywane do Zoho w formacie `yyyy-MM-dd HH:mm:ss`; puste daty są pomijane.
 
 ---
 
 ## Statusy faktur
 
-### Queue – statusy wierszy
+### Zoho Invoices Queue – statusy wierszy
 
 | Status | Znaczenie |
 |--------|-----------|
@@ -135,7 +135,7 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 | `Copied` | Pomyślnie skopiowana do Fakturowni |
 | `CopyFailed` | Błąd podczas kopiowania – do ponowienia przez Retry |
 
-### KSeF – status aktualizacji Zoho
+### Fakturownia KSeF Sync – status aktualizacji Zoho
 
 | Status | Znaczenie |
 |--------|-----------|
@@ -161,5 +161,5 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 
 - **Kolejność operacji:** Import → Copy (lub Retry) → KSeF Sync. Operacje można uruchamiać niezależnie, ale mają sens tylko w tej kolejności.
 - **Idempotentność:** Każda operacja jest bezpieczna do wielokrotnego uruchomienia – duplikaty są wykrywane i pomijane.
-- **Diagnostyka:** Zakładka **History** przechowuje kompletny log wszystkich operacji z timestampami i komunikatami błędów. To główne narzędzie do debugowania problemów.
+- **Diagnostyka:** Zakładka **Invoice Action History** przechowuje kompletny log wszystkich operacji z timestampami i komunikatami błędów. To główne narzędzie do debugowania problemów.
 - **Błędy częściowe:** Błąd pojedynczej faktury nie zatrzymuje przetwarzania całej partii – pozostałe faktury są dalej przetwarzane.
