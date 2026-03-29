@@ -66,9 +66,13 @@ Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
 3. Dla każdej faktury:
    - Pobiera pełne dane z Zoho Billing.
    - Mapuje pola Zoho na format Fakturowni, uwzględniając pola niestandardowe:
-     - `cf_nip` → NIP nabywcy
+     - `cf_nip` → NIP nabywcy, z automatycznym rozpoznaniem typu:
+       - zaczyna się od litery (np. `DE123...`) → oznaczany jako NIP UE (`nip_ue`)
+       - zaczyna się od cyfry → traktowany jako polski NIP
+       - brak NIP + kraj inny niż Polska → dozwolone (podmiot zagraniczny bez VAT)
+       - brak NIP + kraj Polska → **błąd**, faktura nie zostanie skopiowana (NIP jest wymagany dla polskich podmiotów)
      - `cf_nabywca` → opcjonalne nadpisanie nazwy nabywcy
-     - `cf_rola_odbiorcy` + `cf_nip_odbiorcy` → dane odbiorcy, jeśli różni się od nabywcy
+     - `cf_rola_odbiorcy` + `cf_nip_odbiorcy` → dane odbiorcy, jeśli różni się od nabywcy (NIP odbiorcy podlega tej samej logice rozpoznania typu co NIP nabywcy)
      - `cf_czy_nabywca_to_jst` → jeśli `true`, faktura w Fakturowni jest oznaczana jako wystawiona dla jednostki samorządu terytorialnego (JST)
    - Tworzy fakturę w Fakturowni.
    - Zapisuje ID faktury Fakturowni z powrotem do Zoho jako pole `fakturownia_invoice_id`.
