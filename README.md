@@ -123,14 +123,6 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 
 ## Reguły mapowania Zoho → Fakturownia
 
-### Daty
-
-| Pole Fakturowni | Źródło |
-|-----------------|--------|
-| Data wystawienia | `InvoiceDate` z Zoho → fallback: pole `Date` → fallback: bieżąca data UTC |
-| Data sprzedaży | identyczna z datą wystawienia |
-| Termin płatności | `DueDate` z Zoho → jeśli brak: `data wystawienia + PaymentTermsDays` → jeśli brak obu: równa dacie wystawienia |
-
 ### Waluta
 
 Przepisywana z Zoho. Jeśli pole jest puste, przyjmowana jest wartość domyślna `PLN`.
@@ -139,18 +131,11 @@ Przepisywana z Zoho. Jeśli pole jest puste, przyjmowana jest wartość domyśln
 
 Pobierane z adresu organizacji Zoho (miasto). Wymaga podania `zohoOrganizationId` w konfiguracji.
 
-### Pozycje faktury
-
-- Ilość zaokrąglana do liczby całkowitej; wartości ≤ 0 traktowane jako 1.
-- Jeśli faktura w Zoho nie ma żadnych pozycji, tworzona jest jedna zastępcza pozycja z numerem faktury jako opisem i wartością netto równą `SubTotal` (lub `Total` gdy brak `SubTotal`).
-
 ### Obsługa rabatów
 
 Kontrolowana przez parametr `PRESERVE_DISCOUNTS`:
 
-- **`false` (domyślnie):** rabat jest wkalkulowany w cenę jednostkową netto – Fakturownia nie widzi oddzielnego rabatu. Logika:
-  - jeśli `item_total` ≥ `price × qty` (rabat na poziomie całej faktury) → cena netto = `(item_total − discount_amount) / qty`
-  - jeśli `item_total` < `price × qty` (rabat na poziomie pozycji) → cena netto = `item_total / qty`
+- **`false` (domyślnie):** rabat jest wkalkulowany w cenę jednostkową netto – Fakturownia nie widzi oddzielnego rabatu.
 - **`true`:** oryginalna cena z Zoho jest zachowana, a procent rabatu przekazywany jako osobne pole do Fakturowni.
 
 ### Pola niestandardowe Zoho (custom fields)
@@ -165,7 +150,7 @@ Kontrolowana przez parametr `PRESERVE_DISCOUNTS`:
 
 #### Odbiorca
 
-Odbiorca faktury jest wypełniany **tylko wtedy, gdy jednocześnie** pole `Attention` w adresie dostawy Zoho (imię i nazwisko odbiorcy) **oraz** pole `cf_rola_odbiorcy` są niepuste. Brak któregokolwiek z nich powoduje, że faktura jest tworzona bez odbiorcy – nie jest to błąd.
+Odbiorca faktury jest wypełniany **tylko wtedy, gdy jednocześnie** pole `Attention` w adresie dostawy Zoho **oraz** pole `cf_rola_odbiorcy` są niepuste. Brak któregokolwiek z nich powoduje, że faktura jest tworzona bez odbiorcy – nie jest to błąd.
 
 | Pole Zoho | Efekt w Fakturowni |
 |-----------|-------------------|
