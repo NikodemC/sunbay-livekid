@@ -155,15 +155,23 @@ Kontrolowana przez parametr `PRESERVE_DISCOUNTS`:
 
 ### Pola niestandardowe Zoho (custom fields)
 
+#### Nabywca
+
 | Pole Zoho | Efekt w Fakturowni |
 |-----------|-------------------|
 | `cf_nip` | NIP nabywcy – typ rozpoznawany automatycznie: zaczyna się od litery → `nip_ue` (NIP UE); zaczyna się od cyfry → polski NIP; brak NIP + kraj ≠ PL → `empty` (dozwolone); brak NIP + kraj PL → **błąd** (NIP wymagany) |
 | `cf_nabywca` | Nadpisuje nazwę nabywcy pobraną z Zoho (opcjonalne) |
 | `cf_czy_nabywca_to_jst` | Jeśli `true` → faktura oznaczana jako wystawiona dla jednostki samorządu terytorialnego (JST) |
-| `cf_rola_odbiorcy` + `ShippingAddress.Attention` | Odbiorca faktury (patrz niżej) |
-| `cf_nip_odbiorcy` | NIP odbiorcy – ta sama logika rozpoznania typu co dla nabywcy |
 
-> **Odbiorca faktury:** pole odbiorcy w Fakturowni jest wypełniane **tylko wtedy, gdy jednocześnie** pole `Attention` w adresie dostawy Zoho (imię i nazwisko odbiorcy) **oraz** pole `cf_rola_odbiorcy` są niepuste. Brak któregokolwiek z nich powoduje, że faktura jest tworzona bez odbiorcy – nie jest to błąd.
+#### Odbiorca
+
+Odbiorca faktury jest wypełniany **tylko wtedy, gdy jednocześnie** pole `Attention` w adresie dostawy Zoho (imię i nazwisko odbiorcy) **oraz** pole `cf_rola_odbiorcy` są niepuste. Brak któregokolwiek z nich powoduje, że faktura jest tworzona bez odbiorcy – nie jest to błąd.
+
+| Pole Zoho | Efekt w Fakturowni |
+|-----------|-------------------|
+| `ShippingAddress.Attention` | Imię i nazwisko odbiorcy |
+| `cf_rola_odbiorcy` | Rola odbiorcy (np. kupujący, płatnik) |
+| `cf_nip_odbiorcy` | NIP odbiorcy – ta sama logika rozpoznania typu co dla nabywcy |
 
 ### Konwersja nazw krajów
 
