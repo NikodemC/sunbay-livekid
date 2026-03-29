@@ -57,11 +57,11 @@ Pobiera nowe faktury z Zoho i dodaje je do kolejki w arkuszu.
 
 ### 2. Kopiowanie faktur do Fakturowni
 
-Dla faktur ze statusem `New` lub `Queued` tworzy odpowiadające im faktury w Fakturowni.
+Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
 
 **Przebieg:**
 
-1. Wczytuje wiersze z **Zoho Invoices Queue** i filtruje te ze statusem `New` lub `Queued`.
+1. Wczytuje wiersze z **Zoho Invoices Queue** i filtruje te ze statusem `New`.
 2. Przetwarza faktury partiami – rozmiar partii konfigurowany przez `batchSizeCopy` w zakładce Config.
 3. Dla każdej faktury:
    - Pobiera pełne dane z Zoho Billing.
@@ -89,7 +89,7 @@ Dla faktur ze statusem `New` lub `Queued` tworzy odpowiadające im faktury w Fak
 
 Ponowne przetworzenie faktur, które nie zostały skopiowane z powodu błędu.
 
-Identyczna logika jak operacja 2 – jedyna różnica to filtrowanie faktur ze statusem `CopyFailed` zamiast `New`/`Queued`. Rozmiar partii konfigurowany przez `batchSizeRetry` w zakładce Config.
+Identyczna logika jak operacja 2 – jedyna różnica to filtrowanie faktur ze statusem `CopyFailed` zamiast `New`. Rozmiar partii konfigurowany przez `batchSizeRetry` w zakładce Config.
 
 Operacja jest bezpieczna do wielokrotnego uruchomienia – faktury już skopiowane są automatycznie pomijane.
 
@@ -131,7 +131,6 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 | Status | Znaczenie |
 |--------|-----------|
 | `New` | Zaimportowana z Zoho, czeka na skopiowanie |
-| `Queued` | Oznaczona ręcznie do przetworzenia |
 | `Copied` | Pomyślnie skopiowana do Fakturowni |
 | `CopyFailed` | Błąd podczas kopiowania – do ponowienia przez Retry |
 
