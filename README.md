@@ -65,15 +65,7 @@ Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
 2. Przetwarza faktury partiami – rozmiar partii konfigurowany przez `batchSizeCopy` w zakładce Config.
 3. Dla każdej faktury:
    - Pobiera pełne dane z Zoho Billing.
-   - Mapuje pola Zoho na format Fakturowni, uwzględniając pola niestandardowe:
-     - `cf_nip` → NIP nabywcy, z automatycznym rozpoznaniem typu:
-       - zaczyna się od litery (np. `DE123...`) → oznaczany jako NIP UE (`nip_ue`)
-       - zaczyna się od cyfry → traktowany jako polski NIP
-       - brak NIP + kraj inny niż Polska → dozwolone (podmiot zagraniczny bez VAT)
-       - brak NIP + kraj Polska → **błąd**, faktura nie zostanie skopiowana (NIP jest wymagany dla polskich podmiotów)
-     - `cf_nabywca` → opcjonalne nadpisanie nazwy nabywcy
-     - `cf_rola_odbiorcy` + `cf_nip_odbiorcy` → dane odbiorcy, jeśli różni się od nabywcy (NIP odbiorcy podlega tej samej logice rozpoznania typu co NIP nabywcy)
-     - `cf_czy_nabywca_to_jst` → jeśli `true`, faktura w Fakturowni jest oznaczana jako wystawiona dla jednostki samorządu terytorialnego (JST)
+   - Mapuje pola Zoho na format Fakturowni według poniższych reguł (szczegóły w sekcji [Reguły mapowania](#reguły-mapowania-zoho-→-fakturownia)).
    - Tworzy fakturę w Fakturowni.
    - Zapisuje ID faktury Fakturowni z powrotem do Zoho jako pole `fakturownia_invoice_id`.
    - Aktualizuje wiersz w Zoho Invoices Queue: status `Copied`, ID/numer faktury Fakturowni, link do faktury.
@@ -126,6 +118,56 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
 - Faktura z już pomyślnie zapisanym statusem KSeF w Zoho → pomijana w kolejnych uruchomieniach.
 - Jeśli aktualizacja Zoho się nie powiedzie → status w zakładce **Fakturownia KSeF Sync** oznaczany jako `Failed`; faktura zostanie podjęta ponownie przy następnym uruchomieniu.
 - Daty są przekazywane do Zoho w formacie `yyyy-MM-dd HH:mm:ss`; puste daty są pomijane.
+
+---
+
+## Reguły mapowania Zoho → Fakturownia
+
+### Daty
+
+| Pole Fakturowni | Źródło |
+|-----------------|--------|
+| Data wystawienia | `InvoiceDate` z Zoho → fallback: pole `Date` → fallback: bieżąca data UTC |
+| Data sprzedaży | identyczna z datą wystawienia |
+| Termin płatności | `DueDate` z Zoho → jeśli brak: `data wystawienia + PaymentTermsDays` → jeśli brak obu: równa dacie wystawienia |
+
+### Waluta
+
+Przepisywana z Zoho. Jeśli pole jest puste, przyjmowana jest wartość domyślna `PLN`.
+
+### Miejsce wystawienia
+
+Pobierane z adresu organizacji Zoho (miasto). Wymaga podania `zohoOrganizationId` w konfiguracji.
+
+### Pozycje faktury
+
+- Ilość zaokrąglana do liczby całkowitej; wartości ≤ 0 traktowane jako 1.
+- Jeśli faktura w Zoho nie ma żadnych pozycji, tworzona jest jedna zastępcza pozycja z numerem faktury jako opisem i wartością netto równą `SubTotal` (lub `Total` gdy brak `SubTotal`).
+
+### Obsługa rabatów
+
+Kontrolowana przez parametr `PRESERVE_DISCOUNTS`:
+
+- **`false` (domyślnie):** rabat jest wkalkulowany w cenę jednostkową netto – Fakturownia nie widzi oddzielnego rabatu. Logika:
+  - jeśli `item_total` ≥ `price × qty` (rabat na poziomie całej faktury) → cena netto = `(item_total − discount_amount) / qty`
+  - jeśli `item_total` < `price × qty` (rabat na poziomie pozycji) → cena netto = `item_total / qty`
+- **`true`:** oryginalna cena z Zoho jest zachowana, a procent rabatu przekazywany jako osobne pole do Fakturowni.
+
+### Pola niestandardowe Zoho (custom fields)
+
+| Pole Zoho | Efekt w Fakturowni |
+|-----------|-------------------|
+| `cf_nip` | NIP nabywcy – typ rozpoznawany automatycznie: zaczyna się od litery → `nip_ue` (NIP UE); zaczyna się od cyfry → polski NIP; brak NIP + kraj ≠ PL → `empty` (dozwolone); brak NIP + kraj PL → **błąd** (NIP wymagany) |
+| `cf_nabywca` | Nadpisuje nazwę nabywcy pobraną z Zoho (opcjonalne) |
+| `cf_czy_nabywca_to_jst` | Jeśli `true` → faktura oznaczana jako wystawiona dla jednostki samorządu terytorialnego (JST) |
+| `cf_rola_odbiorcy` + `ShippingAddress.Attention` | Odbiorca faktury (patrz niżej) |
+| `cf_nip_odbiorcy` | NIP odbiorcy – ta sama logika rozpoznania typu co dla nabywcy |
+
+> **Odbiorca faktury:** pole odbiorcy w Fakturowni jest wypełniane **tylko wtedy, gdy jednocześnie** pole `Attention` w adresie dostawy Zoho (imię i nazwisko odbiorcy) **oraz** pole `cf_rola_odbiorcy` są niepuste. Brak któregokolwiek z nich powoduje, że faktura jest tworzona bez odbiorcy – nie jest to błąd.
+
+### Konwersja nazw krajów
+
+Nazwy krajów z Zoho są automatycznie konwertowane na kody ISO 3166-1 alfa-2. Obsługiwane są zarówno nazwy angielskie, jak i polskie (`Polska` → `PL`, `Niemcy` → `DE`, `Wielka Brytania` → `GB` itp.) oraz niestandardowe warianty (`u.s.a.` → `US`).
 
 ---
 
