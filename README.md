@@ -154,7 +154,7 @@ Odbiorca faktury jest wypełniany **tylko wtedy, gdy jednocześnie** pole `Atten
 
 | Pole Zoho | Efekt w Fakturowni |
 |-----------|-------------------|
-| `ShippingAddress.Attention` | Imię i nazwisko odbiorcy |
+| `ShippingAddress.Attention` | Nazwa odbiorcy |
 | `cf_rola_odbiorcy` | Rola odbiorcy (np. kupujący, płatnik) |
 | `cf_nip_odbiorcy` | NIP odbiorcy – ta sama logika rozpoznania typu co dla nabywcy |
 
