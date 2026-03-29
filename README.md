@@ -69,6 +69,7 @@ Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
      - `cf_nip` → NIP nabywcy
      - `cf_nabywca` → opcjonalne nadpisanie nazwy nabywcy
      - `cf_rola_odbiorcy` + `cf_nip_odbiorcy` → dane odbiorcy, jeśli różni się od nabywcy
+     - `cf_czy_nabywca_to_jst` → jeśli `true`, faktura w Fakturowni jest oznaczana jako wystawiona dla jednostki samorządu terytorialnego (JST)
    - Tworzy fakturę w Fakturowni.
    - Zapisuje ID faktury Fakturowni z powrotem do Zoho jako pole `fakturownia_invoice_id`.
    - Aktualizuje wiersz w Zoho Invoices Queue: status `Copied`, ID/numer faktury Fakturowni, link do faktury.
