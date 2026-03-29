@@ -190,9 +190,9 @@ Nazwy krajów z Zoho są automatycznie konwertowane na kody ISO 3166-1 alfa-2. O
 |-------|------|
 | `zohoKsefViewId` | ID widoku w Zoho, z którego importowane są faktury |
 | `departmentId` | ID działu w Fakturowni przypisywany do tworzonych faktur |
-| `batchSizeCopy` | Liczba faktur przetwarzanych jednorazowo podczas kopiowania |
-| `batchSizeRetry` | Liczba faktur przetwarzanych jednorazowo podczas retry |
-| `batchSizeKsefSync` | Liczba faktur sprawdzanych jednorazowo podczas synchronizacji KSeF |
+| `batchSizeCopy` | Liczba faktur przetwarzanych jednorazowo podczas kopiowania (maks. 100) |
+| `batchSizeRetry` | Liczba faktur przetwarzanych jednorazowo podczas retry (maks. 100) |
+| `batchSizeKsefSync` | Liczba faktur sprawdzanych jednorazowo podczas synchronizacji KSeF (maks. 100) |
 
 ---
 
@@ -202,3 +202,40 @@ Nazwy krajów z Zoho są automatycznie konwertowane na kody ISO 3166-1 alfa-2. O
 - **Idempotentność:** Każda operacja jest bezpieczna do wielokrotnego uruchomienia – duplikaty są wykrywane i pomijane.
 - **Diagnostyka:** Zakładka **Invoice Action History** przechowuje kompletny log wszystkich operacji z timestampami i komunikatami błędów. To główne narzędzie do debugowania problemów.
 - **Błędy częściowe:** Błąd pojedynczej faktury nie zatrzymuje przetwarzania całej partii – pozostałe faktury są dalej przetwarzane.
+
+---
+
+## Szacunkowa liczba wywołań API
+
+### 1. Import z Zoho (`import-to-sheets`)
+
+Jedno wywołanie Zoho API na stronę wyników (200 faktur/stronę). Fakturownia nie jest odpytywana.
+
+| Faktury | Zoho API | Fakturownia API | Razem |
+|---------|----------|-----------------|-------|
+| 10 | 1 | 0 | **1** |
+| 50 | 1 | 0 | **1** |
+| 100 | 1 | 0 | **1** |
+| 500 | 3 | 0 | **3** |
+
+### 2. Kopiowanie do Fakturowni (`copy-to-fakturownia`, domyślny batch=50)
+
+Na każdą fakturę: 2 wywołania Zoho (GET faktura + POST aktualizacja pól niestandardowych) + 1 wywołanie Fakturowni (POST faktura).
+
+| Faktury | Batche | Zoho API | Fakturownia API | Razem |
+|---------|--------|----------|-----------------|-------|
+| 10 | 1 | 20 | 10 | **30** |
+| 50 | 1 | 100 | 50 | **150** |
+| 100 | 2 | 200 | 100 | **300** |
+| 500 | 10 | 1000 | 500 | **1500** |
+
+### 3. Synchronizacja KSeF (`ksef-sync`, domyślny batch=50)
+
+Fakturownia: 1 batch call na uruchomienie. Zoho: 1 wywołanie na fakturę z gotowym statusem KSeF.
+
+| Faktury | Batche | Zoho API | Fakturownia API | Razem |
+|---------|--------|----------|-----------------|-------|
+| 10 | 1 | 10 | 1 | **11** |
+| 50 | 1 | 50 | 1 | **51** |
+| 100 | 2 | 100 | 2 | **102** |
+| 500 | 10 | 500 | 10 | **510** |
