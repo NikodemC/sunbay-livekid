@@ -26,7 +26,7 @@ Google Sheets – Zoho Invoices Queue
     ▼  (2) Copy to Fakturownia
 Fakturownia
     │
-    ▼  (3) KSeF Sync
+    ▼  (3) KSeF Initial Sync + Retry Sync
 Zoho Billing (pola KSeF)
 ```
 
@@ -67,8 +67,23 @@ Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
    - Pobiera pełne dane z Zoho Billing.
    - Mapuje pola Zoho na format Fakturowni według poniższych reguł (szczegóły w sekcji [Reguły mapowania](#reguły-mapowania-zoho-→-fakturownia)).
    - Tworzy fakturę w Fakturowni.
-   - Zapisuje ID faktury Fakturowni z powrotem do Zoho jako pole `fakturownia_invoice_id`.
+   - Zapisuje ID faktury Fakturowni z powrotem do Zoho (nazwa pola konfigurowana przez `fakturowniaInvoiceIdLabel`).
    - Aktualizuje wiersz w Zoho Invoices Queue: status `Copied`, ID/numer faktury Fakturowni, link do faktury.
+
+**Konfiguracja mapowania pól:**
+
+Nazwy pól niestandardowych Zoho używanych przy kopiowaniu są konfigurowalne. Aktualna konfiguracja:
+
+| Parametr | Wartość | Opis |
+|----------|---------|------|
+| `buyerTaxNumberField` | `cf_nip` | Pole Zoho z NIPem nabywcy |
+| `buyerNameOverrideField` | `cf_nabywca` | Pole Zoho nadpisujące nazwę nabywcy |
+| `recipientRoleField` | `cf_rola_odbiorcy` | Pole Zoho z rolą odbiorcy |
+| `recipientTaxNumberField` | `cf_nip_odbiorcy` | Pole Zoho z NIPem odbiorcy |
+| `fakturowniaInvoiceIdLabel` | `fakturownia_invoice_id` | Pole Zoho, w którym zapisywany jest ID faktury z Fakturowni |
+| `zohoInvoiceIdLabel` | `Zoho Invoice Id` | Label kolumny w arkuszu identyfikującej fakturę Zoho |
+| `buyerOverride` | `true` | Dane nabywcy z pól custom Zoho nadpisują dane z kontaktu |
+| `preserveDiscounts` | `false` | Czy przenosić rabaty do Fakturowni (patrz niżej) |
 
 **Edge cases:**
 
@@ -78,7 +93,7 @@ Dla faktur ze statusem `New` tworzy odpowiadające im faktury w Fakturowni.
 - Jeśli pobranie faktury z Zoho lub stworzenie faktury w Fakturowni się nie powiedzie → wiersz otrzymuje status `CopyFailed`.
 - Błąd pojedynczej faktury nie zatrzymuje przetwarzania pozostałych w partii.
 
-> **Uwaga dot. rabatów:** Parametr `PRESERVE_DISCOUNTS` (aktualnie `false`) kontroluje, czy rabaty z Zoho są przenoszone do Fakturowni. Przy wartości `false` pozycje są zapisywane z kwotami finalnymi, po uwzględnieniu rabatu.
+> **Uwaga dot. rabatów:** Parametr `preserveDiscounts` (aktualnie `false`) kontroluje, czy rabaty z Zoho są przenoszone do Fakturowni. Przy wartości `false` pozycje są zapisywane z kwotami finalnymi, po uwzględnieniu rabatu.
 
 ---
 
@@ -94,13 +109,17 @@ Operacja jest bezpieczna do wielokrotnego uruchomienia – faktury już skopiowa
 
 ### 4. Synchronizacja statusów KSeF
 
-Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
+Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho. Operacja podzielona jest na dwa kroki: **KSeF initial sync** (pierwsze sprawdzenie) oraz **KSeF retry sync** (ponowne sprawdzenie faktur, dla których wcześniejsza synchronizacja nie powiodła się).
+
+#### 4a. KSeF initial sync
+
+Sprawdza statusy KSeF dla faktur, które jeszcze nie były synchronizowane.
 
 **Przebieg:**
 
 1. Wczytuje zakładki **Zoho Invoices Queue** i **Fakturownia KSeF Sync** z arkusza.
 2. Wybiera faktury z ID Fakturowni, których status KSeF nie był jeszcze zapisany do Zoho.
-3. Pobiera dane KSeF z Fakturowni hurtowo dla wybranej partii (rozmiar: `batchSizeKsefSync`).
+3. Pobiera dane KSeF z Fakturowni hurtowo dla wybranej partii (rozmiar: `batchSizeKsefSyncInitial`).
 4. Dla każdej faktury:
    - Odczytuje status KSeF (`gov_status`) i kategoryzuje go:
      - `ok` / `demo_ok` → sukces KSeF
@@ -112,11 +131,17 @@ Pobiera status KSeF z Fakturowni i zapisuje go z powrotem do Zoho.
      - Komunikaty błędów (tylko przy błędnym statusie)
    - Aktualizuje wiersz w zakładce **Fakturownia KSeF Sync**.
 
-**Edge cases:**
+#### 4b. KSeF retry sync
+
+Ponowne sprawdzenie faktur ze statusem `Failed` w zakładce **Fakturownia KSeF Sync**. Logika identyczna jak w kroku 4a — rozmiar partii konfigurowany przez `batchSizeKsefSyncRetry`.
+
+Operacja jest bezpieczna do wielokrotnego uruchomienia — faktury z już pomyślnie zapisanym statusem KSeF w Zoho są pomijane.
+
+**Edge cases (oba kroki):**
 
 - Faktury ze statusem `Unknown` → Zoho nie jest aktualizowane; faktura zostanie sprawdzona ponownie przy kolejnym uruchomieniu.
 - Faktura z już pomyślnie zapisanym statusem KSeF w Zoho → pomijana w kolejnych uruchomieniach.
-- Jeśli aktualizacja Zoho się nie powiedzie → status w zakładce **Fakturownia KSeF Sync** oznaczany jako `Failed`; faktura zostanie podjęta ponownie przy następnym uruchomieniu.
+- Jeśli aktualizacja Zoho się nie powiedzie → status w zakładce **Fakturownia KSeF Sync** oznaczany jako `Failed`; faktura zostanie podjęta ponownie przez **KSeF retry sync**.
 - Daty są przekazywane do Zoho w formacie `yyyy-MM-dd HH:mm:ss`; puste daty są pomijane.
 
 ---
@@ -192,13 +217,14 @@ Nazwy krajów z Zoho są automatycznie konwertowane na kody ISO 3166-1 alfa-2. O
 | `departmentId` | ID działu w Fakturowni przypisywany do tworzonych faktur |
 | `batchSizeCopy` | Liczba faktur przetwarzanych jednorazowo podczas kopiowania (maks. 100) |
 | `batchSizeRetry` | Liczba faktur przetwarzanych jednorazowo podczas retry (maks. 100) |
-| `batchSizeKsefSync` | Liczba faktur sprawdzanych jednorazowo podczas synchronizacji KSeF (maks. 100) |
+| `batchSizeKsefSyncInitial` | Liczba faktur sprawdzanych jednorazowo podczas pierwszej synchronizacji KSeF (maks. 100) |
+| `batchSizeKsefSyncRetry` | Liczba faktur sprawdzanych jednorazowo podczas retry synchronizacji KSeF (maks. 100) |
 
 ---
 
 ## Uwagi operacyjne
 
-- **Kolejność operacji:** Import → Copy (lub Retry) → KSeF Sync. Operacje można uruchamiać niezależnie, ale mają sens tylko w tej kolejności.
+- **Kolejność operacji:** Import → Copy (lub Retry) → KSeF Initial Sync (lub KSeF Retry Sync). Operacje można uruchamiać niezależnie, ale mają sens tylko w tej kolejności.
 - **Idempotentność:** Każda operacja jest bezpieczna do wielokrotnego uruchomienia – duplikaty są wykrywane i pomijane.
 - **Diagnostyka:** Zakładka **Invoice Action History** przechowuje kompletny log wszystkich operacji z timestampami i komunikatami błędów. To główne narzędzie do debugowania problemów.
 - **Błędy częściowe:** Błąd pojedynczej faktury nie zatrzymuje przetwarzania całej partii – pozostałe faktury są dalej przetwarzane.
@@ -229,9 +255,9 @@ Na każdą fakturę: 2 wywołania Zoho (GET faktura + POST aktualizacja pól nie
 | 100 | 2 | 200 | 100 | **300** |
 | 500 | 10 | 1000 | 500 | **1500** |
 
-### 3. Synchronizacja KSeF (`ksef-sync`, domyślny batch=50)
+### 3. Synchronizacja KSeF – initial sync i retry sync (domyślny batch=50 każdy)
 
-Fakturownia: 1 batch call na uruchomienie. Zoho: 1 wywołanie na fakturę z gotowym statusem KSeF.
+Fakturownia: 1 batch call na uruchomienie. Zoho: 1 wywołanie na fakturę z gotowym statusem KSeF. Szacunki dotyczą pojedynczego uruchomienia (initial lub retry).
 
 | Faktury | Batche | Zoho API | Fakturownia API | Razem |
 |---------|--------|----------|-----------------|-------|
