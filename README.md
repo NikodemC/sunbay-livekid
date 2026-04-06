@@ -133,9 +133,9 @@ Sprawdza statusy KSeF dla faktur, które jeszcze nie były synchronizowane.
 
 #### 4b. KSeF retry sync
 
-Ponowne sprawdzenie faktur ze statusem `Failed` w zakładce **Fakturownia KSeF Sync**. Logika identyczna jak w kroku 4a — rozmiar partii konfigurowany przez `batchSizeKsefSyncRetry`.
+Ponowne sprawdzenie faktur ze statusem `Failed` w zakładce **Fakturownia KSeF Sync**. Logika identyczna jak w kroku 4a - rozmiar partii konfigurowany przez `batchSizeKsefSyncRetry`.
 
-Operacja jest bezpieczna do wielokrotnego uruchomienia — faktury z już pomyślnie zapisanym statusem KSeF w Zoho są pomijane.
+Operacja jest bezpieczna do wielokrotnego uruchomienia - faktury z już pomyślnie zapisanym statusem KSeF w Zoho są pomijane.
 
 **Edge cases (oba kroki):**
 
